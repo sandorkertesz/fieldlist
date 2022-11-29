@@ -57,19 +57,19 @@ WRAP_MATHS_ATTRS = {
 def wrap_maths(cls):
     def wrap_single_method(fn):
         def wrapper(self):
-            return cls._compute_1(fn, self)
+            return cls._compute_any(fn, self)
 
         return wrapper
 
     def wrap_double_method(fn):
         def wrapper(self, other):
-            return cls._compute_2(fn, self, other)
+            return cls._compute_any(fn, self, other)
 
         return wrapper
 
     def wrap_double_method_r(fn):
         def wrapper(self, other):
-            return cls._compute_2(fn, other, self)
+            return cls._compute_any(fn, other, self)
 
         return wrapper
 

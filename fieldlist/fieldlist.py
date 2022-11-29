@@ -192,7 +192,6 @@ class FieldList:
         num = len(self)
         if num > 0:
             return self[: min(num + 1, n + 1) :].ls()
-        return None
 
     def tail(self, n=5):
         if n <= 0:
@@ -200,7 +199,6 @@ class FieldList:
         num = len(self)
         if num > 0:
             return self[-min(num, n) :].ls()
-        return None
 
     def ls(self, extra_keys=None, filter=None, no_print=False):
         keys = list(LS_KEYS)
@@ -290,11 +288,7 @@ class FieldList:
         return ""
 
     def compute(self, func, *args):
-        if len(args) == 0:
-            return self._compute_1(func, self)
-        elif len(args) == 1:
-            return self._compute_2(func, self, args[0])
-        raise ValueError("Too many arguments")
+        return self._compute_any(func, self, *args)
 
     def accumulate(self):
         result = []
@@ -318,62 +312,43 @@ class FieldList:
         return None
 
     @classmethod
-    def _compute_1(cls, func, fl):
-        def _compute():
-            for f in fl._fields:
-                with f.manage_handle():
-                    yield GribField._compute_1(func, f)
+    def _compute_any(cls, func, *args):
+        def _comp():
+            # TODO: ensure single fieldlists are only expanded once
+            for it in zip(*x):
+                # print("next")
+                # for h in it:
+                #     print(f" {type(h)}")
+                z = [v.values for v in it]
+                c = it[template_idx].set_values(func(*z))
+                for v in it:
+                    v.release()
+                yield c
 
-        return cls.from_tmp_handles(_compute())
+        num = 0
+        template_idx = None
 
-    @classmethod
-    def _compute_2(cls, func, fl1, fl2):
-        def _compute(d1, d2):
-            if len(d1) == len(d2):
-                for f1, f2 in zip(d1._fields, d2._fields):
-                    with f1.manage_handle(), f2.manage_handle():
-                        yield GribField._compute_2(func, f1, f2)
-            elif len(d1) == 1:
-                f1 = d1._fields[0]
-                with f1.manage_handle():
-                    for f2 in d2._fields:
-                        with f2.manage_handle():
-                            yield GribField._compute_2(func, f1, f2)
-            elif len(d2) == 1:
-                f2 = d2._fields[0]
-                with f2.manage_handle():
-                    for f1 in d1._fields:
-                        with f1.manage_handle():
-                            yield GribField._compute_2(func, f1, f2)
+        for i, v in enumerate(args):
+            if isinstance(v, FieldList):
+                num = max(num, len(v))
 
-        def _compute_left(d1, d2):
-            for f in d1._fields:
-                with f.manage_handle():
-                    yield GribField._compute_2(func, f, d2)
-
-        def _compute_right(d1, d2):
-            for f in d2._fields:
-                with f.manage_handle():
-                    yield GribField._compute_2(func, d1, f)
-
-        if not (isinstance(fl1, FieldList) or isinstance(fl2, FieldList)):
-            raise TypeError("")
-
-        if isinstance(fl1, FieldList) and isinstance(fl2, FieldList):
-            if len(fl1) == len(fl2) or len(fl1) == 1 or len(fl2) == 1:
-                return cls.from_tmp_handles(_compute(fl1, fl2))
+        x = []
+        for i, item in enumerate(args):
+            if isinstance(item, FieldList):
+                if len(item) == num:
+                    x.append(MultiFLIterVar(item, num))
+                elif len(item) == 1:
+                    x.append(SingleFLIterVar(item, num))
+                else:
+                    raise ValueError(
+                        f"Wrong number of fields={len(item)} in positional arg {i}. FieldLists must have the same number of fields={num} for this operation or they should contain a single field!"
+                    )
+                if template_idx is None:
+                    template_idx = i
             else:
-                raise Exception(
-                    f"FieldLists must have the same number of fields for this operation! {len(fl1)} != {len(fl2)}"
-                )
-        else:
-            if isinstance(fl1, FieldList):
-                print("call left")
-                return cls.from_tmp_handles(_compute_left(fl1, fl2))
-            elif isinstance(fl2, FieldList):
-                return cls.from_tmp_handles(_compute_right(fl1, fl2))
-            else:
-                raise ValueError("Invalid arguments")
+                x.append(ScalarIterVar(item, num))
+
+        return cls.from_tmp_handles(_comp())
 
 
 # expose all FieldList functions as a module level function
@@ -386,14 +361,67 @@ def _make_module_func(name):
 
 module_obj = sys.modules[__name__]
 for fn in dir(FieldList):
-    if callable(getattr(FieldList, fn)) and not fn.startswith("_"):
+    if callable(getattr(FieldList, fn)) and not fn.startswith("_") and fn != "compute":
         setattr(module_obj, fn, _make_module_func(fn))
 
 
 def bind_functions(namespace, module_name=None):
-    """Add to the module globals all metview functions except operators like: +, &, etc."""
-    # namespace["read"] = read
+    """Add to the module globals all FieldList functions except operators like: +, &, etc."""
+    namespace["compute"] = compute
     for fn in dir(FieldList):
-        if callable(getattr(FieldList, fn)) and not fn.startswith("_"):
+        if (
+            callable(getattr(FieldList, fn))
+            and not fn.startswith("_")
+            and fn != "compute"
+        ):
             namespace[fn] = _make_module_func(fn)
         namespace["FieldList"] = FieldList
+
+
+def compute(func, *args):
+    return FieldList._compute_any(func, *args)
+
+
+class ScalarWrapped:
+    def __init__(self, v):
+        self.values = v
+
+    def release(self):
+        pass
+
+
+class IterVar:
+    def __init__(self, f, num):
+        self.f = f
+        self.num = num
+
+    def __len__(self):
+        return self.num
+
+    def __getitem__(self, idx):
+        raise NotImplementedError()
+
+
+class SingleFLIterVar(IterVar):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def __getitem__(self, idx):
+        return self.f._fields[0]
+
+
+class MultiFLIterVar(IterVar):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def __getitem__(self, idx):
+        return self.f._fields[idx]
+
+
+class ScalarIterVar(IterVar):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.w = ScalarWrapped(self.f)
+
+    def __getitem__(self, idx):
+        return self.w
