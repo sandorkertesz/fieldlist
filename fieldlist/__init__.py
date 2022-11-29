@@ -7,10 +7,17 @@
 # nor does it submit to any jurisdiction.
 #
 
-from .fieldlist import FieldList
+# from .fieldlist import FieldList
 
-__all__ = [
-    "FieldList",
-]
+from . import fieldlist
+
+fieldlist.bind_functions(globals(), module_name=__name__)
+
+from .codes import set_write_accuracy
+
+# __all__ = [
+#     "FieldList",
+# ]
+
 
 from .version import __version__

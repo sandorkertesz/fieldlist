@@ -111,6 +111,15 @@ def get_messages_positions(path):
         os.close(fd)
 
 
+def set_write_accuracy(accuracy):
+    if not isinstance(accuracy, int):
+        raise TypeError("accuracy must be an int")
+    if accuracy == -1 or accuracy > 0:
+        GribHandle.ACCURACY = accuracy
+    else:
+        raise ValueError("accuracy={accuracy} must be > 0 or -1")
+
+
 class GribHandle:
     """The GRIB message handle"""
 

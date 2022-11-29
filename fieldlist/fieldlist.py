@@ -9,6 +9,7 @@
 
 import glob
 import logging
+import sys
 
 import numpy as np
 import pandas as pd
@@ -366,3 +367,26 @@ class FieldList:
                 return cls.from_tmp_handles(_compute_right(fl1, fl2))
             else:
                 raise ValueError("Invalid arguments")
+
+
+# expose all FieldList functions as a module level function
+def _make_module_func(name):
+    def wrapped(fs, *args):
+        return getattr(fs, name)(*args)
+
+    return wrapped
+
+
+module_obj = sys.modules[__name__]
+for fn in dir(FieldList):
+    if callable(getattr(FieldList, fn)) and not fn.startswith("_"):
+        setattr(module_obj, fn, _make_module_func(fn))
+
+
+def bind_functions(namespace, module_name=None):
+    """Add to the module globals all metview functions except operators like: +, &, etc."""
+    # namespace["read"] = read
+    for fn in dir(FieldList):
+        if callable(getattr(FieldList, fn)) and not fn.startswith("_"):
+            namespace[fn] = _make_module_func(fn)
+        namespace["FieldList"] = FieldList
