@@ -119,41 +119,27 @@ class FieldList:
     def _attributes(self, names):
         return self._collect(GribField._attributes, names)
 
+    # used by cfgrib
+    def items(self):
+        for i, f in enumerate(self):
+            yield (i, f)
+
     def to_numpy(self):
         return self.values
 
-    def to_xarray(self, via_file=True, **kwarg):
+    def to_xarray(self, **kwarg):
         # soft dependency on cfgrib
         try:
             import xarray as xr
         except ImportError:
             print("Package xarray not found. Try running 'pip install xarray'.")
             raise
-        # dataset = xr.open_dataset(self.url(), engine="cfgrib", backend_kwargs=kwarg)
-        if via_file:
-            dataset = xr.open_dataset(self.url(), engine="cfgrib", backend_kwargs=kwarg)
-        else:
-            print("Using experimental cfgrib interface to go directly from FieldList")
-            dataset = xr.open_dataset(self, engine="cfgrib", backend_kwargs=kwarg)
-        return dataset
-
-    # def to_xarray(self):
-    #     assert self._unfiltetered
-    #     assert self.path
-
-    #     import xarray as xr
-
-    #     params = self.source.cfgrib_options()
-    #     if isinstance(self.path, (list, tuple)):
-    #         ds = xr.open_mfdataset(self.path, engine="cfgrib", **params)
-    #     else:
-    #         ds = xr.open_dataset(self.path, engine="cfgrib", **params)
-    #     return self.source.post_xarray_open_dataset_hook(ds)
+        return xr.open_dataset(self, engine="cfgrib", backend_kwargs=kwarg)
 
     def _make_new(self, func, *args, **kwargs):
         def _call():
             for f in self._fields:
-                with f.expand():
+                with f.manage_handle():
                     yield func(f, *args, **kwargs)
 
         return FieldList.from_tmp_handles(_call())
@@ -161,7 +147,7 @@ class FieldList:
     def _make_new_each(self, func, field_args, *args, **kwargs):
         def _call():
             for f, x in zip(self._fields, field_args):
-                with f.expand():
+                with f.manage_handle():
                     yield func(f, x, *args, **kwargs)
 
         return FieldList.from_tmp_handles(_call())
@@ -169,7 +155,7 @@ class FieldList:
     def _collect(self, func, *args, **kwargs):
         result = []
         for f in self._fields:
-            with f.expand():
+            with f.manage_handle():
                 if callable(func):
                     result.append(func(f, *args, **kwargs))
                 else:
@@ -314,19 +300,19 @@ class FieldList:
     def accumulate(self):
         result = []
         for f in self._fields:
-            with f.expand():
+            with f.manage_handle():
                 result.append(np.nansum(f.values))
         return result
 
     def sum(self):
         if len(self._fields) > 0:
             f0 = self._fields[0]
-            with f0.expand():
+            with f0.manage_handle():
                 v = f0.values
 
             for i in range(1, len(self._fields)):
                 f = self._fields[i]
-                with f.expand():
+                with f.manage_handle():
                     v += f.values
 
             return self.from_tmp_handles([f0.set_values(v)])
@@ -336,7 +322,7 @@ class FieldList:
     def _compute_1(cls, func, fl):
         def _compute():
             for f in fl._fields:
-                with f.expand():
+                with f.manage_handle():
                     yield GribField._compute_1(func, f)
 
         return cls.from_tmp_handles(_compute())
@@ -345,18 +331,18 @@ class FieldList:
     def _compute_2(cls, func, fl1, fl2):
         def _compute(d1, d2):
             for f1, f2 in zip(d1._fields, d2._fields):
-                with f1.expand():
-                    with f2.expand():
+                with f1.manage_handle():
+                    with f2.manage_handle():
                         yield GribField._compute_2(func, f1, f2)
 
         def _compute_left(d1, d2):
             for f in d1._fields:
-                with f.expand():
+                with f.manage_handle():
                     yield GribField._compute_2(func, f, d2)
 
         def _compute_right(d1, d2):
             for f in d2._fields:
-                with f.expand():
+                with f.manage_handle():
                     yield GribField._compute_2(func, d1, f)
 
         if not (isinstance(fl1, FieldList) or isinstance(fl2, FieldList)):

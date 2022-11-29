@@ -348,7 +348,7 @@ class GribField:
     #     self.release
 
     @contextmanager
-    def expand(self):
+    def manage_handle(self):
         try:
             yield self
         finally:
