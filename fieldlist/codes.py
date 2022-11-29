@@ -1,4 +1,4 @@
-# (C) Copyright 2020 ECMWF.
+# (C) Copyright 2022 ECMWF.
 #
 # This software is licensed under the terms of the Apache Licence Version 2.0
 # which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -21,34 +21,6 @@ import numpy as np
 
 
 LOG = logging.getLogger(__name__)
-
-LS_KEYS = [
-    "centre",
-    "shortName",
-    "typeOfLevel",
-    "level",
-    "dataDate",
-    "dataTime",
-    "stepRange",
-    "dataType",
-    "number",
-    "gridType",
-]
-
-DESCRIBE_KEYS = [
-    "shortName"
-    "typeOfLevel"
-    "level"
-    "date"
-    "time"
-    "step"
-    "number"
-    "paramId"
-    "marsClass"
-    "marsStream"
-    "marsType"
-    "experimentVersionNumber"
-]
 
 
 class TmpFile:
@@ -165,18 +137,6 @@ class GribHandle:
     def __del__(self):
         # print(f"Handle delete {self.path} {self.offset}")
         eccodes.codes_release(self.handle)
-        # self.release()
-
-    # def release(self):
-    #     if self._handle is not None:
-    #         eccodes.codes_release(self._handle)
-    #         self._handle = None
-
-    # @property
-    # def handle(self):
-    #     if self._handle is None:
-    #         self.reader.at_offset(self.offset)
-    #     return self._handle
 
     def get(self, name, key_type=None):
         """Get the value of a given ecCodes key"""
@@ -316,39 +276,6 @@ class GribHandle:
             return f.read(length)
 
 
-# class ReaderLRUCache(dict):
-#     def __init__(self, size):
-#         self.lock = threading.Lock()
-#         self.size = size
-
-#     def __getitem__(self, path):
-#         with self.lock:
-#             try:
-#                 return super().__getitem__(path)
-#             except KeyError:
-#                 pass
-
-#             c = self[path] = GribReader(path)
-#             self._trim()
-#             return c
-
-#     def _trim(self):
-#         while len(self) >= self.size:
-#             oldest = min((v.last, v.path) for v in self.values())
-#             del self[oldest[1]]
-
-#     def add_reader(self, reader):
-#         if reader.path not in self:
-#             self[reader.path] = reader
-#         self._trim()
-
-#     def remove(self, path):
-#         self.pop(path, None)
-
-
-# READER_CACHE = ReaderLRUCache(512)
-
-
 class GribReader:
     """Represents the GRIB file object. Provides iterator through the GRIB handles"""
 
@@ -381,46 +308,9 @@ class GribReader:
     def __del__(self):
         self.close()
 
-    # @classmethod
-    # def from_path(cls, path):
-    #     offsets, lengths = GribReader._build_offsets_lengths_mapping(path)
-    #     return cls(path, offsets, lengths)
-
-    # @classmethod
-    # def from_cache(cls, path):
-    #     return READER_CACHE[path]
-
-    # @classmethod
-    # def from_fields(cls, path, fields):
-    #     offsets = []
-    #     lengths = []
-    #     for f in fields:
-    #         offsets.append(f.offset)
-    #         lengths.append(f.length)
-    #     return cls(path, offsets, lengths)
-
     def scan(self):
         for offset, length in get_messages_positions(self.path):
             yield GribField(self, None, offset, length)
-
-    # @staticmethod
-    # def _build_offsets_lengths_mapping(path):
-    #     offsets = []
-    #     lengths = []
-
-    #     for offset, length in get_messages_positions(path):
-    #         offsets.append(offset)
-    #         lengths.append(length)
-
-    #     return offsets, lengths
-
-    # @staticmethod
-    # def _remove_from_cache(path):
-    #     READER_CACHE.remove(path)
-
-    # def at_offset(self, offset):
-    #     self.file.seek(offset, 0)
-    #     return self.__next__()
 
     def at_offset(self, offset):
         self.open()
@@ -433,28 +323,6 @@ class GribReader:
             )
             assert handle is not None
             return GribHandle(handle, self.path, offset)
-
-    # def __iter__(self):
-    #     return self
-
-    # def __getitem__(self, index):
-    #     if index > len(self):
-    #         raise StopIteration()
-    #     return GribField(self, self.path, offset=self.offsets[index])
-
-    # def __next__(self):
-    #     return GribField(handle, self.path, offset)et = self.file.tell()
-    #     # handle = eccodes.codes_new_from_file(self.file, eccodes.CODES_PRODUCT_GRIB)
-    #     # if not handle:
-    #     #     raise StopIteration()
-    #     # return GribHandle(handle, self.path, offset)
-
-    # def __len__(self):
-    #     return len(self.offsets)
-
-    # @property
-    # def offset(self):
-    #     return self.file.tell()
 
 
 class TmpGribReader(GribReader):
@@ -481,28 +349,14 @@ class GribField:
         self._offset = offset
         self._length = length
 
-    def __enter__(self):
-        return self
+    # def __enter__(self):
+    #     return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.release
-
-    # @property
-    # def path(self):
-    #     return self.handle.path
-
-    # @classmethod
-    # def from_handle(cls, handle):
+    # def __exit__(self, exc_type, exc_val, exc_tb):
+    #     self.release
 
     @contextmanager
     def expand(self):
-        try:
-            yield self
-        finally:
-            self.release()
-
-    @contextmanager
-    def guard_handle(self):
         try:
             yield self
         finally:
@@ -598,12 +452,6 @@ class GribField:
 
     def __getitem__(self, name):
         return self.get(name)
-
-    # def __setitem__(self, name, value):
-    #     try:
-    #         self.handle.set(name, value)
-    #     except eccodes.GribInternalError as e:
-    #         raise KeyError(f"failed to set key={name} to {value} {e}")
 
     def get(self, name):
         if isinstance(name, (list, tuple)):
