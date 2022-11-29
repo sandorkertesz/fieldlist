@@ -284,12 +284,6 @@ class GribReader:
         self.path = path
         self.lock = threading.Lock()
         self.file = None
-        # self.offsets = offsets
-        # self.lengths = lengths
-        # self.last = time.time()
-
-        # self.file = open(self.path, "rb")
-        # READER_CACHE.add(self)
 
         if self.path is not None:
             if not os.path.exists(self.path):
