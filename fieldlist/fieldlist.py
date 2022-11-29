@@ -145,14 +145,6 @@ class FieldList:
 
         return FieldList.from_tmp_handles(_call())
 
-    def _make_new_each(self, func, field_args, *args, **kwargs):
-        def _call():
-            for f, x in zip(self._fields, field_args):
-                with f.manage_handle():
-                    yield func(f, x, *args, **kwargs)
-
-        return FieldList.from_tmp_handles(_call())
-
     def _collect(self, func, *args, **kwargs):
         result = []
         for f in self._fields:
@@ -283,7 +275,13 @@ class FieldList:
             raise ValueError(
                 f"set_values: number of 1d-arrays={len(values)} does not match the number of fields={len(self)}"
             )
-        return self._make_new_each(GribField.set_values, list_of_arrays)
+
+        def _call():
+            for f, x in zip(self._fields, list_of_arrays):
+                with f.manage_handle():
+                    yield f.set_values(x)
+
+        return FieldList.from_tmp_handles(_call())
 
     def _first_path(self):
         """For debugging purposes"""
@@ -296,7 +294,7 @@ class FieldList:
             return self._compute_1(func, self)
         elif len(args) == 1:
             return self._compute_2(func, self, args[0])
-        raise ValueError("compute")
+        raise ValueError("Too many arguments")
 
     def accumulate(self):
         result = []
@@ -333,9 +331,8 @@ class FieldList:
         def _compute(d1, d2):
             if len(d1) == len(d2):
                 for f1, f2 in zip(d1._fields, d2._fields):
-                    with f1.manage_handle():
-                        with f2.manage_handle():
-                            yield GribField._compute_2(func, f1, f2)
+                    with f1.manage_handle(), f2.manage_handle():
+                        yield GribField._compute_2(func, f1, f2)
             elif len(d1) == 1:
                 f1 = d1._fields[0]
                 with f1.manage_handle():
