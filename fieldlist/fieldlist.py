@@ -331,10 +331,23 @@ class FieldList:
     @classmethod
     def _compute_2(cls, func, fl1, fl2):
         def _compute(d1, d2):
-            for f1, f2 in zip(d1._fields, d2._fields):
+            if len(d1) == len(d2):
+                for f1, f2 in zip(d1._fields, d2._fields):
+                    with f1.manage_handle():
+                        with f2.manage_handle():
+                            yield GribField._compute_2(func, f1, f2)
+            elif len(d1) == 1:
+                f1 = d1._fields[0]
                 with f1.manage_handle():
-                    with f2.manage_handle():
-                        yield GribField._compute_2(func, f1, f2)
+                    for f2 in d2._fields:
+                        with f2.manage_handle():
+                            yield GribField._compute_2(func, f1, f2)
+            elif len(d2) == 1:
+                f2 = d2._fields[0]
+                with f2.manage_handle():
+                    for f1 in d1._fields:
+                        with f1.manage_handle():
+                            yield GribField._compute_2(func, f1, f2)
 
         def _compute_left(d1, d2):
             for f in d1._fields:
@@ -350,18 +363,15 @@ class FieldList:
             raise TypeError("")
 
         if isinstance(fl1, FieldList) and isinstance(fl2, FieldList):
-            if len(fl1) == len(fl2):
+            if len(fl1) == len(fl2) or len(fl1) == 1 or len(fl2) == 1:
                 return cls.from_tmp_handles(_compute(fl1, fl2))
-            elif len(fl1) == 1:
-                return cls.from_tmp_handles(_compute_left(fl1, fl2))
-            elif len(fl2) == 1:
-                return cls.from_tmp_handles(_compute_right(fl1, fl2))
             else:
                 raise Exception(
                     f"FieldLists must have the same number of fields for this operation! {len(fl1)} != {len(fl2)}"
                 )
         else:
             if isinstance(fl1, FieldList):
+                print("call left")
                 return cls.from_tmp_handles(_compute_left(fl1, fl2))
             elif isinstance(fl2, FieldList):
                 return cls.from_tmp_handles(_compute_right(fl1, fl2))

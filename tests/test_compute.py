@@ -640,93 +640,92 @@ def test_sum():
 #         assert d == utils.date_from_str(vdate_ref[i])
 
 
-# def test_bitmap():
-#     fs = mv.fieldlist(path=os.path.join(PATH, "t1000_LL_2x2.grb"))
+def test_bitmap():
+    fs = FieldList(file_in_testdir("t1000_LL_2x2.grib"))
 
-#     # -- const field
-#     f = fs * 0 + 1
+    # -- const field
+    f = fs * 0 + 1
 
-#     # non missing
-#     r = mv.bitmap(f, 0)
-#     np.testing.assert_allclose(r.values(), f.values())
+    # non missing
+    r = f.bitmap(0)
+    np.testing.assert_allclose(r.values, f.values)
 
-#     # all missing
-#     r = mv.bitmap(f, 1)
-#     np.testing.assert_allclose(r.values(), f.values() * np.nan)
+    # all missing
+    r = f.bitmap(1)
+    np.testing.assert_allclose(r.values, f.values * np.nan)
 
-#     # -- non const field
-#     f = fs
+    # -- non const field
+    f = fs
 
-#     # bitmap with value
-#     f_mask = f > 300
-#     r = mv.bitmap(f_mask, 1)
-#     v_ref = f_mask.values()
-#     v_ref[v_ref == 1] = np.nan
-#     np.testing.assert_allclose(r.values(), v_ref)
+    # bitmap with value
+    f_mask = f > 300
+    r = f_mask.bitmap(1)
+    v_ref = f_mask.values
+    v_ref[v_ref == 1] = np.nan
+    np.testing.assert_allclose(r.values, v_ref)
 
-#     f_mask = f > 300
-#     r = mv.bitmap(f_mask * 2, 2)
-#     v_ref = f_mask.values() * 2
-#     v_ref[v_ref == 2] = np.nan
-#     np.testing.assert_allclose(r.values(), v_ref)
+    f_mask = f > 300
+    r = (f_mask * 2).bitmap(2)
+    v_ref = f_mask.values * 2
+    v_ref[v_ref == 2] = np.nan
+    np.testing.assert_allclose(r.values, v_ref)
 
-#     # bitmap with field
-#     f = mv.bitmap(fs > 300, 0)
-#     r = mv.bitmap(fs, f)
-#     v_ref = fs.values() * f.values()
-#     np.testing.assert_allclose(r.values(), v_ref)
+    # bitmap with field
+    f = (fs > 300).bitmap(0)
+    r = fs.bitmap(f)
+    v_ref = fs.values * f.values
+    np.testing.assert_allclose(r.values, v_ref)
 
-#     # multiple fields
-#     f = mv.fieldlist(path=os.path.join(PATH, "monthly_avg.grib"))
-#     f = f[0:2]
+    # multiple fields
+    f = FieldList(file_in_testdir("monthly_avg.grib"))
+    f = f[0:2]
 
-#     # with value
-#     f_mask = f > 300
-#     r = mv.bitmap(f_mask, 1)
-#     assert len(r) == len(f)
-#     for i in range(len(r)):
-#         v_ref = f_mask[i].values()
-#         v_ref[v_ref == 1] = np.nan
-#         np.testing.assert_allclose(r[i].values(), v_ref)
+    # with value
+    f_mask = f > 300
+    r = f_mask.bitmap(1)
+    assert len(r) == len(f)
+    for i in range(len(r)):
+        v_ref = f_mask[i].values
+        v_ref[v_ref == 1] = np.nan
+        np.testing.assert_allclose(r[i].values, v_ref)
 
-#     # with field
-#     f1 = mv.bitmap(f > 300, 0)
-#     r = mv.bitmap(f, f1)
-#     assert len(r) == len(f1)
-#     for i in range(len(r)):
-#         v_ref = f[i].values() * f1[i].values()
-#         np.testing.assert_allclose(r[i].values(), v_ref)
+    # with field
+    f1 = (f > 300).bitmap(0)
+    r = f.bitmap(f1)
+    assert len(r) == len(f1)
+    for i in range(len(r)):
+        v_ref = f[i].values * f1[i].values
+        np.testing.assert_allclose(r[i].values, v_ref)
 
-#     # with single field
-#     f1 = mv.bitmap(f[0] > 300, 0)
-#     r = mv.bitmap(f, f1)
-#     assert len(r) == len(f)
-#     for i in range(len(r)):
-#         v_ref = f[i].values() * f1.values()
-#         np.testing.assert_allclose(r[i].values(), v_ref)
+    # with single field
+    f1 = (f[0] > 300).bitmap(0)
+    r = f.bitmap(f1)
+    assert len(r) == len(f)
+    for i in range(len(r)):
+        v_ref = f[i].values * f1.values
+        np.testing.assert_allclose(r[i].values, v_ref)
 
 
-# def test_nobitmap():
+def test_nobitmap():
+    fs = FieldList(file_in_testdir("t_with_missing.grib"))
 
-#     fs = mv.fieldlist(path=os.path.join(PATH, "t_with_missing.grib"))
+    # single field
+    f = fs
+    r = f.nobitmap(1)
+    assert len(r) == 1
+    v_ref = f.values
+    v_ref[np.isnan(v_ref)] = 1
+    np.testing.assert_allclose(r.values, v_ref)
 
-#     # single field
-#     f = fs
-#     r = mv.nobitmap(f, 1)
-#     assert len(r) == 1
-#     v_ref = f.values()
-#     v_ref[np.isnan(v_ref)] = 1
-#     np.testing.assert_allclose(r.values(), v_ref)
+    # multiple fields
+    f = fs.merge(2 * fs)
+    r = f.nobitmap(1)
+    assert len(r) == 2
 
-#     # multiple fields
-#     f = fs.merge(2 * fs)
-#     r = mv.nobitmap(f, 1)
-#     assert len(r) == 2
-
-#     for i in range(len(r)):
-#         v_ref = f[i].values()
-#         v_ref[np.isnan(v_ref)] = 1
-#         np.testing.assert_allclose(r[i].values(), v_ref)
+    for i in range(len(r)):
+        v_ref = f[i].values
+        v_ref[np.isnan(v_ref)] = 1
+        np.testing.assert_allclose(r[i].values, v_ref)
 
 
 # def test_grib_index_0():
