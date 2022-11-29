@@ -53,8 +53,6 @@ def missing_is_none(x):
 
 # This does not belong here, should be in the C library
 def get_messages_positions(path):
-
-    print(f"scan={path}")
     fd = os.open(path, os.O_RDONLY)
     try:
 

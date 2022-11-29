@@ -106,8 +106,6 @@ def process_ls(df, no_print):
 
 
 def process_describe(df, param=None, groupby=[], no_print=False):
-    print(f"df={df}")
-
     init_pandas_options()
     labels = {"marsClass": "class", "marsStream": "stream", "marsType": "type"}
     no_header = False

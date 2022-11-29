@@ -36,7 +36,6 @@ class FieldListDb:
             self._scan()
 
     def _scan(self):
-        print(f"SCAN {self.index_keys}")
         self.items = self.data._attributes(self.index_keys)
 
     def _valid(self, item, filter_by_keys):
@@ -49,7 +48,6 @@ class FieldListDb:
         return True
 
     def filter(self, filter_by_keys):
-        print(f"Filter by keys={filter_by_keys}")
         self.update(list(filter_by_keys.keys()))
 
         for i, v in enumerate(self.items):
