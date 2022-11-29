@@ -7,10 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from inspect import ArgInfo
-import numpy as np
+
+import gc
 import os
 import pytest
+
+import numpy as np
 
 from fieldlist import FieldList
 from fieldlist.codes import GribField
@@ -61,7 +63,7 @@ def test_fieldlist_create_from_glob_path_single():
 
 
 def test_fieldlist_create_from_glob_path_multi():
-    f = FieldList(file_in_testdir("t_*.grib"))
+    f = FieldList(file_in_testdir("t_[f,w]*.grib"))
     assert isinstance(f, FieldList)
     assert len(f) == 7
     par_ref = [
@@ -77,7 +79,7 @@ def test_fieldlist_create_from_glob_path_multi():
 
 
 def test_fieldlist_create_from_glob_paths():
-    f = FieldList([file_in_testdir("test.g*ib"), file_in_testdir("t_*.grib")])
+    f = FieldList([file_in_testdir("test.g*ib"), file_in_testdir("t_[f,w]*.grib")])
     assert isinstance(f, FieldList)
     assert len(f) == 8
     par_ref = [
@@ -103,9 +105,9 @@ def test_grib_get_string_1():
     f = FieldList(file_in_testdir("test.grib"))
     for name in ("shortName", "shortName:s", "shortName:str"):
         sn = f.get(name)
-        assert sn == ["2t"]
+        assert sn == "2t"
         sn = f[name]
-        assert sn == ["2t"]
+        assert sn == "2t"
 
 
 def test_grib_get_string_18():
@@ -121,9 +123,9 @@ def test_grib_get_long_1():
     f = FieldList(file_in_testdir("test.grib"))
     for name in ("level", "level:l", "level:int"):
         r = f.get(name)
-        assert r == [0]
+        assert r == 0
         r = f[name]
-        assert r == [0]
+        assert r == 0
 
 
 def test_grib_get_long_18():
@@ -184,7 +186,7 @@ def test_grib_get_double_18():
 
 def test_grib_get_long_array_1():
     f = FieldList(file_in_testdir("rgg_small_subarea_cellarea_ref.grib"))
-    pl = f.get("pl")[0]
+    pl = f.get("pl")
     assert isinstance(pl, np.ndarray)
     assert len(pl) == 73
     assert pl[0] == 24
@@ -195,7 +197,7 @@ def test_grib_get_long_array_1():
 
 def test_grib_get_double_array_values_1():
     f = FieldList(file_in_testdir("test.grib"))
-    v = f.get("values")[0]
+    v = f.get("values")
     assert isinstance(v, np.ndarray)
     assert len(v) == 115680
     assert np.isclose(v[0], 260.4356)
@@ -261,6 +263,11 @@ def test_grib_get_generic():
     assert lgk == [[1000, 1000, 1000, 850], ["t", "u", "v", "t"]]
     with pytest.raises(ValueError):
         lgk = f.get(["level:d", "cfVarName"], "silly")
+
+    f = FieldList(file_in_testdir("tuv_pl.grib"))[0]
+    lg = f.get(["level", "cfVarName"])
+    assert lg == [[1000, "t"]]
+
     # ln = f.get(["level:n"])
     # assert ln == [[1000], [1000], [1000], [850]]
     # cn = f.get(["centre:n"])
@@ -308,7 +315,7 @@ def test_values_18():
 
 def test_values_with_missing():
     f = FieldList(file_in_testdir("t_with_missing.grib"))
-    v = f.values[0]
+    v = f.values
     assert isinstance(v, np.ndarray)
     assert v.shape == (2664,)
     eps = 0.001
@@ -436,6 +443,7 @@ def test_temporary_file():
     temp_path = g._first_path()
     assert os.path.isfile(temp_path)
     g = None
+    gc.collect()
     assert not os.path.isfile(temp_path)
 
 
@@ -444,14 +452,15 @@ def test_permanent_file_not_accidentally_deleted():
     f = FieldList(path)
     assert os.path.isfile(path)
     f = None
+    gc.collect()
     assert os.path.isfile(path)
 
 
 def test_single_index_0():
     f = FieldList(file_in_testdir("tuv_pl.grib"))
     r = f[0]
-    assert isinstance(r, GribField)
-    # assert len(r) == 1
+    assert isinstance(r, FieldList)
+    assert len(r) == 1
     assert r.get("shortName") == "t"
     v = r.values
     eps = 0.001
@@ -462,8 +471,8 @@ def test_single_index_0():
 def test_single_index_17():
     f = FieldList(file_in_testdir("tuv_pl.grib"))
     r = f[17]
-    assert isinstance(r, GribField)
-    # assert len(r) == 1
+    assert isinstance(r, FieldList)
+    assert len(r) == 1
     assert r.get("shortName") == "v"
     v = r.values
     eps = 0.001
@@ -474,8 +483,8 @@ def test_single_index_17():
 def test_single_index_minus_1():
     f = FieldList(file_in_testdir("tuv_pl.grib"))
     r = f[-1]
-    assert isinstance(r, GribField)
-    # assert len(r) == 1
+    assert isinstance(r, FieldList)
+    assert len(r) == 1
     assert r.get("shortName") == "v"
     v = r.values
     eps = 0.001
@@ -608,20 +617,21 @@ def test_str():
     # assert str(f) == "Fieldset (18 fields)"
 
 
-# def test_set_values_single_field():
-#     f = mv.Fieldset(path=os.path.join(PATH, "tuv_pl.grib"))
-#     f0 = f[0]
-#     f0_vals = f0.values()
-#     vals_plus_10 = f0_vals + 10
-#     f0_modified = f0.set_values(vals_plus_10)
-#     f0_mod_vals = f0_modified.values()
-#     np.testing.assert_allclose(f0_mod_vals, vals_plus_10)
-#     # write to disk, read and check again
-#     testpath = "f0_modified.grib"
-#     f0_modified.write(testpath)
-#     f0_read = mv.Fieldset(path=testpath)
-#     np.testing.assert_allclose(f0_read.values(), vals_plus_10)
-#     os.remove(testpath)
+def test_set_values_single_field():
+    f = FieldList(file_in_testdir("tuv_pl.grib"))
+    f0 = f[0]
+    f0_vals = f0.values
+    vals_plus_10 = f0_vals + 10
+    f0_modified = f0.set_values(vals_plus_10)
+    f0_mod_vals = f0_modified.values
+    np.testing.assert_allclose(f0_mod_vals, vals_plus_10)
+
+    # write to disk, read and check again
+    testpath = "written_f0_modified.grib"
+    f0_modified.write(testpath)
+    f0_read = FieldList(testpath)
+    np.testing.assert_allclose(f0_read.values, vals_plus_10)
+    os.remove(testpath)
 
 
 def test_set_values_multiple_fields():
@@ -645,9 +655,7 @@ def test_set_values_with_missing_values():
     new_vals = f.values + 40
     g = f.set_values(new_vals)
     v = g.values
-    assert v.shape == (1, 2664)
-    v = v[0]
-    # assert v.shape == (2664,)
+    assert v.shape == (2664,)
     eps = 0.001
     assert np.isclose(v[0], 272.5642 + 40, eps)
     assert np.isnan(v[798])
@@ -657,16 +665,15 @@ def test_set_values_with_missing_values():
 
 
 def test_set_values_with_missing_values_2():
-    return
-    # f = FieldList(file_in_testdir("t_with_missing.grib"))
-    # g = f[0]
-    # v = g.values
-    # v[1] = np.nan
-    # h = g.set_values(v)
-    # hv = h.values()[:10]
-    # assert np.isclose(hv[0], 272.56417847)
-    # assert np.isnan(hv[1])
-    # assert np.isclose(hv[2], 272.56417847)
+    f = FieldList(file_in_testdir("t_with_missing.grib"))
+    g = f[0]
+    v = g.values
+    v[1] = np.nan
+    h = g.set_values(v)
+    hv = h.values[:10]
+    assert np.isclose(hv[0], 272.56417847)
+    assert np.isnan(hv[1])
+    assert np.isclose(hv[2], 272.56417847)
 
 
 # def test_set_values_resize():
@@ -684,19 +691,22 @@ def test_set_values_with_missing_values_2():
 #     np.testing.assert_allclose(f0_mod_vals, f0_20vals, eps)
 
 
-# def test_vals_destroyed():
-#     f = FieldList(file_in_testdir("test.grib"))
-#     assert f.fields[0].vals is None
-#     g = f.values()
-#     assert isinstance(g, np.ndarray)
-#     assert f.fields[0].vals is None
-#     f = -f
-#     assert f.fields[0].vals is None
-#     g = f.values()
-#     assert isinstance(g, np.ndarray)
-#     assert f.fields[0].vals is None
-#     f = f + 1
-#     assert f.fields[0].vals is None
-#     g = f.values()
-#     assert isinstance(g, np.ndarray)
-#     assert f.fields[0].vals is None
+def test_handle_released():
+    f = FieldList(file_in_testdir("tuv_pl.grib"))
+    r = f["typeOfLevel"]
+    assert r == ["isobaricInhPa"] * 18
+    assert f.count_open_handles() == 0
+
+    g = f.set(level=200)
+    assert f.count_open_handles() == 0
+    assert g.count_open_handles() == 0
+
+    r = g["level"]
+    assert r == [200] * 18
+    assert g.count_open_handles() == 0
+
+    v = f[0].values
+    assert f.count_open_handles() == 0
+    g = f[0].set_values(v * 0 + 1)
+    assert f.count_open_handles() == 0
+    assert g.count_open_handles() == 0

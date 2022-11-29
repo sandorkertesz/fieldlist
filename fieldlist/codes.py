@@ -463,6 +463,17 @@ class TmpGribReader(GribReader):
         super().__init__(self.tmp_file.path)
 
 
+class FieldReleaser:
+    def __init__(self, field):
+        self.field = field
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.field.release()
+
+
 class GribField:
     def __init__(self, reader, handle=None, offset=None, length=None):
         self.reader = reader
@@ -470,11 +481,11 @@ class GribField:
         self._offset = offset
         self._length = length
 
-    # def __enter__(self):
-    #     return self
+    def __enter__(self):
+        return self
 
-    # def __exit__(self, exc_type, exc_val, exc_tb):
-    #     pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release
 
     # @property
     # def path(self):
@@ -485,6 +496,13 @@ class GribField:
 
     @contextmanager
     def expand(self):
+        try:
+            yield self
+        finally:
+            self.release()
+
+    @contextmanager
+    def guard_handle(self):
         try:
             yield self
         finally:
@@ -502,6 +520,10 @@ class GribField:
         if self._handle is not None:
             # print(f"{self.__class__.__name__}.release offset={self._offset}")
             self._handle = None
+
+    @property
+    def path(self):
+        return self.reader.path if self.reader is not None else ""
 
     @property
     def values(self):
@@ -529,11 +551,6 @@ class GribField:
         if Ni is None or Nj is None:
             return self.get("numberOfDataPoints")
         return (Nj, Ni)
-
-    def set_values(self, values):
-        result = self.handle.clone()
-        result.set_values(values)
-        return result
 
     def __repr__(self):
         return "{}({},{},{},{},{},{})".format(
@@ -594,9 +611,10 @@ class GribField:
         else:
             return self.handle.get(name)
 
-    def args_to_dict(self, *args, **kwargs):
-        print(f"args={args}")
-        print(f"kwargs={kwargs}")
+    @staticmethod
+    def args_to_dict(*args, **kwargs):
+        # print(f"args={args}")
+        # print(f"kwargs={kwargs}")
         if args:
             if kwargs:
                 raise ValueError()
@@ -611,13 +629,16 @@ class GribField:
         else:
             raise ValueError()
 
-    def _set_handle(self, *args, **kwargs):
-        print(f"args={args}")
-        print(f"kwargs={kwargs}")
+    def set(self, *args, **kwargs):
         vals = self.args_to_dict(*args, **kwargs)
         result = self.handle.clone()
         for k, v in vals.items():
             result.set(k, v)
+        return result
+
+    def set_values(self, values):
+        result = self.handle.clone()
+        result.set_values(values)
         return result
 
     def clone(self):
@@ -631,13 +652,13 @@ class GribField:
         #     self._offset = self.handle.offset
 
     @staticmethod
-    def _compute_handle(func, f):
+    def _compute_1(func, f):
         result = f.handle.clone()
         result.set_values(func(f.values))
         return result
 
     @staticmethod
-    def _compute_2_handle(func, f1, f2):
+    def _compute_2(func, f1, f2):
         result = None
         if isinstance(f1, GribField):
             result = f1.handle.clone()

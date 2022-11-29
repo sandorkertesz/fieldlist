@@ -297,27 +297,55 @@ def test_field_maths_funcs():
     np.testing.assert_allclose(r.values(), np.mod(v, v1), rtol=1e-04)
 
 
-# def test_accumulate():
-#     f = mv.fieldlist(path=os.path.join(PATH, "t1000_LL_7x7.grb"))
-#     v = mv.accumulate(f)
-#     assert isinstance(v, float)
-#     assert np.isclose(v, 393334.244141)
+def test_accumulate():
+    f = FieldList(file_in_testdir("t1000_LL_7x7.grib"))
+    v = f.accumulate()[0]
+    assert isinstance(v, float)
+    assert np.isclose(v, 393334.244141)
 
-#     f = mv.fieldlist(path=os.path.join(PATH, "monthly_avg.grib"))
-#     v = mv.accumulate(f)
-#     assert isinstance(v, list)
-#     v_ref = [
-#         408058.256226,
-#         413695.059631,
-#         430591.282776,
-#         428943.981812,
-#         422329.622498,
-#         418016.024231,
-#         409755.097961,
-#         402741.786194,
-#     ]
-#     assert len(v) == len(f)
-#     np.testing.assert_allclose(v, v_ref)
+    f = FieldList(file_in_testdir("monthly_avg.grib"))
+    v = f.accumulate()
+    assert isinstance(v, list)
+    v_ref = [
+        408058.256226,
+        413695.059631,
+        430591.282776,
+        428943.981812,
+        422329.622498,
+        418016.024231,
+        409755.097961,
+        402741.786194,
+    ]
+    assert len(v) == len(f)
+    np.testing.assert_allclose(v, v_ref)
+
+
+def test_sum():
+    fs = FieldList(file_in_testdir("t1000_LL_7x7.grib"))
+
+    print(len(fs))
+    # single fields
+    f = fs
+    print(len(fs))
+    r = f.sum()
+    assert len(r) == 1
+    np.testing.assert_allclose(r.values, fs.values)
+
+    # known sum
+    f = fs.merge(fs)
+    f = f.merge(fs)
+    r = f.sum()
+    assert len(r) == 1
+    np.testing.assert_allclose(r.values, fs.values * 3)
+
+    # real life example
+    f = FieldList(file_in_testdir("monthly_avg.grib"))
+    r = f.sum()
+    assert len(r) == 1
+    v_ref = r.values * 0
+    for g in f:
+        v_ref += g.values
+    np.testing.assert_allclose(r.values, v_ref)
 
 
 # def test_average():

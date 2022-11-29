@@ -7,57 +7,10 @@
 # nor does it submit to any jurisdiction.
 #
 
-from .fieldlist_mv import FieldList
-
-# from .readers.grib.index import FieldSetInOneFile
-
-# from .arguments.transformers import ALL
-# from .core.caching import CACHE as cache
-# from .core.initialise import initialise
-# from .core.settings import SETTINGS as settings
-# from .datasets import Dataset
-# from .datasets import get_dataset as dataset  # so the user can do: cml.dataset(...)
-# from .datasets import load_dataset
-# from .distributed.dask import start_dask
-# from .plotting import interactive_map, new_plot, new_table
-# from .plotting import options as plotting_options
-# from .plotting import plot_graph, plot_map
-# from .readers import Reader
-# from .sources import Source
-# from .sources import get_source as source  # so the user can do: cml.source(...)
-# from .sources import load_source, load_source_lazily
-# from .version import __version__
-# from .wrappers import Wrapper
-
-# __all__ = [
-#     "ALL",
-#     "cache",
-#     "dataset",
-#     "Dataset",
-#     "Wrapper",
-#     "interactive_map",
-#     "load_dataset",
-#     "load_source",
-#     "load_source_lazily",
-#     "new_plot",
-#     "new_table",
-#     "plot_graph",
-#     "plot_map",
-#     "plotting_options",
-#     "Reader",
-#     "settings",
-#     "source",
-#     "Source",
-#     "start_dask",
-#     "__version__",
-# ]
-
-
-# initialise()
+from .fieldlist import FieldList
 
 __all__ = [
-    "ALL",
-    "FieldSetInOneFile",
+    "FieldList",
 ]
 
 from .version import __version__
