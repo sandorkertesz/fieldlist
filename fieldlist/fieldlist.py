@@ -207,11 +207,21 @@ class FieldList:
         res._db = FieldListDb(res, items=md, index_keys=self._db.index_keys)
         return res
 
-    def head(self, rows=5):
-        return self.ls().head(rows)
+    def head(self, n=5):
+        if n <= 0:
+            raise ValueError("n must be > 0")
+        num = len(self)
+        if num > 0:
+            return self[: min(num + 1, n + 1) :].ls()
+        return None
 
-    def tail(self, rows=5):
-        return self.ls().tail(rows)
+    def tail(self, n=5):
+        if n <= 0:
+            raise ValueError("n must be > 0")
+        num = len(self)
+        if num > 0:
+            return self[-min(num, n) :].ls()
+        return None
 
     def ls(self, extra_keys=None, filter=None, no_print=False):
         keys = list(LS_KEYS)
